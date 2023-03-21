@@ -1,5 +1,5 @@
 function data = ddpi_offline(videoFile, options, dDPIParams)
-% This function applies offline digital Dual Purkinje Image (dDPI) 
+% This function applies the offline digital Dual Purkinje Image (dDPI) 
 % algorithm to an input .avi video and outputs the DPI trace of the eye.
 %
 % The dDPI algorithm tracks the Purkinje images using center-of-mass (COM)
