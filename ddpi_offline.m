@@ -1,6 +1,11 @@
 function data = ddpi_offline(videoFile, options, dDPIParams)
-% This function applies offline digital Dual Purkinje Image (dDPI) alogrithm 
+% This function applies offline digital Dual Purkinje Image (dDPI) algorithm 
 % to an input video and tracks eye.
+%
+% The dDPI algorithm track the Purkinje images by template matching and 
+% localize their posity by a rapid and preise method that can be implemented 
+% on GPU. This localization method is developed by Parthasraty 2012. Please
+% see https://doi.org/10.1038/nmeth.2071 for further information
 %
 % EXAMPLE USAGE:
 %  ddpi_offline(videoFileName)
@@ -57,7 +62,10 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     %%% Read vidoe file
-    v = rawVideoReader(videoFile, options.VideoFrameSize(2), options.VideoFrameSize(1));
+    v = rawVideoReader(...
+        videoFile, 
+        options.VideoFrameSize(2), 
+        options.VideoFrameSize(1));
     
     %%% Get image format
     dsImgSize = options.VideoFrameSize / dDPIParams.DownSamping;
@@ -66,9 +74,20 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
     %%% Setup visualization
     if options.Visualize
         vfig = figure();
-        handles = imshow(zeros(options.VideoFrameSize), [0 255]); hold on;
-        handleP1ROI = plot(handles.Parent, [0], [0], '-', 'color', 'r', 'LineWidth', 2);
-        handleP4ROI = plot(handles.Parent, [0], [0], '-', 'color', 'r', 'LineWidth', 2);
+        handles = imshow(zeros(options.VideoFrameSize), [0 255]); 
+        hold on;
+        handleP1ROI = plot(
+            handles.Parent, 
+            [0], [0], 
+            '-', 
+            'color', 'r', 
+            'LineWidth', 2);
+        handleP4ROI = plot(
+            handles.Parent, 
+            [0], [0], 
+            '-', 
+            'color', 'r', 
+            'LineWidth', 2);
         hold off;
     end
     
@@ -77,11 +96,15 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
     [p1xIdx, p1yIdx] = meshgrid(1:dDPIParams.P1ROI, 1:dDPIParams.P1ROI);
     [p4xIdx, p4yIdx] = meshgrid(1:dDPIParams.P4ROI, 1:dDPIParams.P4ROI);
     
-    p4Template = fspecial('gaussian', dDPIParams.P4TemplateSize, dDPIParams.P4Radius / dDPIParams.DownSamping);
-    p4Template = round(p4Template / max(p4Template, [], 'all') * dDPIParams.P4Intensity);
+    p4Template = fspecial(
+        'gaussian', 
+        dDPIParams.P4TemplateSize, 
+        dDPIParams.P4Radius / dDPIParams.DownSamping);
+    p4Template = round(
+        p4Template / max(p4Template, [], 'all') * dDPIParams.P4Intensity);
 
-    tMatcher = vision.TemplateMatcher(...
-        'Metric', 'Sum of squared differences', ...
+    tMatcher = vision.TemplateMatcher(
+        'Metric', 'Sum of squared differences',
         'OutputValue', 'Metric matrix');
     
     %%% Initialize output data frame
@@ -102,7 +125,9 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
         %%% Get next frame %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         frame = v.getNextFrame;
         gImg = frame(:, :, 1);
-        dsImg = gImg(1:dDPIParams.DownSamping:end,1:dDPIParams.DownSamping:end,:);
+        dsImg = gImg(
+            1:dDPIParams.DownSamping:end,
+            1:dDPIParams.DownSamping:end,:);
         cdsImg = dsImg;
         
         %%% P1 estimation and localization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -132,15 +157,16 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
         % Output P1 information
         data.p1.trace(1, frameIdx) = p1x + double(p1ROIx);
         data.p1.trace(2, frameIdx)  = p1y + double(p1ROIy);
-        data.p1.intensity(frameIdx) = p10 / dDPIParams.P1ROI / dDPIParams.P1ROI;
+        data.p1.intensity(frameIdx) = ...
+            p10 / dDPIParams.P1ROI / dDPIParams.P1ROI;
         data.p1.roi(:, frameIdx) = [p1ROIx p1ROIy];
         
         %%% P4 estimation and localization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % Mask P1 ROI (assumes P4 is outside of P1 ROI)
-        dsP1ROI = ...
-            round(double([p1ROIx, p1ROIy]) / dDPIParams.DownSamping * 0.875);
-        dsP1ROIEnd = ...
-            round(double([p1ROIxEnd, p1ROIyEnd]) / dDPIParams.DownSamping * 1.125);
+        dsP1ROI = round(
+            double([p1ROIx, p1ROIy]) / dDPIParams.DownSamping * 0.875);
+        dsP1ROIEnd = round(
+            double([p1ROIxEnd, p1ROIyEnd]) / dDPIParams.DownSamping * 1.125);
         cdsImg(dsP1ROI(2):dsP1ROIEnd(2), dsP1ROI(1):dsP1ROIEnd(1)) = 0;
         
         % Estimate P4 ROI by template matching
@@ -149,7 +175,8 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
         [p4LocY, p4LocX] = ind2sub(size(p4Error), p4ErrorIdx);
         p4Loc = round(dDPIParams.DownSamping * [p4LocX, p4LocY]);
 
-        [p4ROIx, p4ROIxEnd, p4ROIy, p4ROIyEnd] = getROI(p4Loc, dDPIParams.P4ROI, options.VideoFrameSize);
+        [p4ROIx, p4ROIxEnd, p4ROIy, p4ROIyEnd] = ...
+            getROI(p4Loc, dDPIParams.P4ROI, options.VideoFrameSize);
 
         % Extract P4 ROI and fine-tune P4 ROI estimation with COM
         p4ROI = double(gImg(p4ROIy:p4ROIyEnd, p4ROIx:p4ROIxEnd));
@@ -160,7 +187,8 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
         p4cy = round(sum(p4ROI4 .* p4yIdx, 'all') / p40);
         p4Loc = [p4cx + p4ROIx, p4cy + p4ROIy];
 
-        [p4ROIx, p4ROIxEnd, p4ROIy, p4ROIyEnd] = getROI(p4Loc, dDPIParams.P4ROI, options.VideoFrameSize);
+        [p4ROIx, p4ROIxEnd, p4ROIy, p4ROIyEnd] = ...
+            getROI(p4Loc, dDPIParams.P4ROI, options.VideoFrameSize);
 
         % Reextract P4 ROI and apply Gaussian blur
         p4ROI = double(gImg(p4ROIy:p4ROIyEnd, p4ROIx:p4ROIxEnd));
@@ -257,7 +285,8 @@ function [xc, yc, sigma] = radialcenter(I)
     % Grid midpoint coordinates are -n+0.5:n-0.5;
     xm_onerow = -(Nx - 1) / 2.0 + 0.5:(Nx - 1) / 2.0 - 0.5;
     xm = xm_onerow(ones(Ny-1, 1), :);
-    ym_onecol = (-(Ny-1) / 2.0 + 0.5:(Ny-1) / 2.0 - 0.5)';  % Note that y increases "downward"
+    % Note that y increases "downward"
+    ym_onecol = (-(Ny-1) / 2.0 + 0.5:(Ny-1) / 2.0 - 0.5)';  
     ym = ym_onecol(:,ones(Nx-1,1));
 
     % Calculate derivatives along 45-degree shifted coordinates (u and v)
@@ -331,7 +360,8 @@ function [xc, yc, sigma] = radialcenter(I)
     xoffset = px - xc;
     yoffset = py - yc;
     r2 = xoffset.*xoffset + yoffset.*yoffset;
-    sigma = sqrt(sum( sum(Isub .*r2)) / sum(Isub(:) )) / 2;  % Second moment is 2*Gaussian width
+    % Second moment is 2*Gaussian width
+    sigma = sqrt(sum( sum(Isub .*r2)) / sum(Isub(:) )) / 2;  
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
