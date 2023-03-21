@@ -3,9 +3,9 @@ function data = ddpi_offline(videoFile, options, dDPIParams)
 % to an input video and tracks eye.
 %
 % The dDPI algorithm track the Purkinje images by template matching and 
-% localize their posity by a rapid and preise method that can be implemented 
-% on GPU. This localization method is developed by Parthasraty 2012. Please
-% see https://doi.org/10.1038/nmeth.2071 for further information
+% localize their position by a rapid and preise method that can be 
+% implemented on GPU. This localization method is developed by Parthasraty 
+% 2012. Please see https://doi.org/10.1038/nmeth.2071 for further information
 %
 % EXAMPLE USAGE:
 %  ddpi_offline(videoFileName)
